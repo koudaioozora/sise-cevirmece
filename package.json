@@ -1,0 +1,14 @@
+{
+  "name": "lokal-anonim-masa",
+  "version": "1.0.0",
+  "description": "Lokal — Pastel temalı, anonim, cinsiyetsiz, 2-6 kişilik sesli/yazılı Doğruluk mu Cesaret mi ve kalıcı mektup kutusu oyunu",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "MIT"
+}
