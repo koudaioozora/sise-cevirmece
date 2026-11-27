@@ -74,7 +74,7 @@ function serveStatic(req, res) {
     res.writeHead(200, {
       'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
       'X-Content-Type-Options': 'nosniff',
-      'Cache-Control': 'no-cache'
+      'Cache-Control': 'no-store'
     });
     fs.createReadStream(resolved).pipe(res);
   });
