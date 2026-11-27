@@ -7,9 +7,15 @@ const crypto = require('crypto');
 
 const { SimpleWebSocketServer } = require('./src/ws');
 const { GameManager, MIN_PLAYERS, MAX_PLAYERS } = require('./src/gameEngine');
-const { ANONYMOUS_AVATARS, getShopCatalog } = require('./src/questions');
+const { ANONYMOUS_AVATARS, getDeckList } = require('./src/questions');
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type'
+};
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -25,6 +31,7 @@ const MIME_TYPES = {
 function sendJson(res, statusCode, data) {
   const body = JSON.stringify(data);
   res.writeHead(statusCode, {
+    ...CORS_HEADERS,
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff'
@@ -77,14 +84,19 @@ function createAppServer({
   spinDurationMs = 4300,
   answerTimeoutMs = 30000,
   botDelayMs = 950,
-  adCooldownMs = 4000,
   seedRooms = true
 } = {}) {
-  const game = new GameManager({ spinDurationMs, answerTimeoutMs, botDelayMs, adCooldownMs, seedRooms });
+  const game = new GameManager({ spinDurationMs, answerTimeoutMs, botDelayMs, seedRooms });
   const connections = new Map(); // playerId -> wsClient
 
   const httpServer = http.createServer((req, res) => {
     const urlPath = (req.url || '/').split('?')[0];
+
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, CORS_HEADERS);
+      res.end();
+      return;
+    }
 
     if (req.method === 'GET' && urlPath === '/api/health') {
       return sendJson(res, 200, {
@@ -99,7 +111,7 @@ function createAppServer({
         minPlayers: MIN_PLAYERS,
         maxPlayers: MAX_PLAYERS,
         avatars: ANONYMOUS_AVATARS,
-        shopCatalog: getShopCatalog()
+        decks: getDeckList()
       });
     }
 
@@ -176,7 +188,7 @@ function createAppServer({
       minPlayers: MIN_PLAYERS,
       maxPlayers: MAX_PLAYERS,
       avatars: ANONYMOUS_AVATARS,
-      shopCatalog: getShopCatalog(),
+      decks: getDeckList(),
       publicRooms: game.getPublicRooms()
     });
 
@@ -427,39 +439,10 @@ function createAppServer({
           break;
         }
 
-        case 'purchase_dm_pack': {
-          const res = game.purchaseDmPack(playerId, msg.packId);
-          if (!res.ok) {
-            ws.sendJson({ type: 'error', error: res.error });
-            return;
-          }
-          ws.sendJson({ type: 'purchase_ok', kind: 'pack', pack: res.pack, account: res.account });
-          break;
-        }
-
-        case 'purchase_deck': {
-          const res = game.purchaseDeck(playerId, msg.deckId);
-          if (!res.ok) {
-            ws.sendJson({ type: 'error', error: res.error });
-            return;
-          }
-          ws.sendJson({
-            type: 'purchase_ok',
-            kind: 'deck',
-            deck: { id: res.deck.id, name: res.deck.name, shortName: res.deck.shortName, emoji: res.deck.emoji },
-            account: res.account
-          });
-          if (res.room) {
-            broadcastToRoom(res.room.code, { type: 'room_state', room: res.room });
-            broadcastPublicRooms();
-          }
-          break;
-        }
-
         case 'select_deck': {
           const res = game.selectDeck(playerId, msg.deckId);
           if (!res.ok) {
-            ws.sendJson({ type: 'error', error: res.error, locked: !!res.locked });
+            ws.sendJson({ type: 'error', error: res.error });
             return;
           }
           ws.sendJson({
@@ -471,24 +454,6 @@ function createAppServer({
           if (res.room) {
             broadcastToRoom(res.room.code, { type: 'room_state', room: res.room });
             broadcastPublicRooms();
-          }
-          break;
-        }
-
-        case 'claim_ad_reward': {
-          const res = game.claimAdReward(playerId);
-          if (!res.ok) {
-            ws.sendJson({ type: 'error', error: res.error });
-            return;
-          }
-          ws.sendJson({
-            type: 'ad_rewarded',
-            pointsAdded: res.pointsAdded,
-            ticketsEarned: res.ticketsEarned,
-            account: res.account
-          });
-          if (res.room) {
-            broadcastToRoom(res.room.code, { type: 'room_state', room: res.room });
           }
           break;
         }
